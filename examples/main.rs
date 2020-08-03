@@ -50,8 +50,8 @@ fn main() -> ! {
         )
     };
 
-    // TODO: fix theesee unwrap hacks
-    let device = Driver::new(spi, cs, dr).unwrap_or_else(|_| panic!("donezo"));
+    // TODO: fix these unwrap hacks
+    let mut device = Driver::new(spi, cs, dr).unwrap_or_else(|_| panic!("donezo"));
 
     loop {
         if device.data_ready().unwrap() {

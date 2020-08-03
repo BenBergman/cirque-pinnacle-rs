@@ -42,11 +42,15 @@ impl<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> Driver<SPI, CS, DR> {
         self.dr.is_high()
     }
 
-    pub fn get_absolute(&self) -> Result<Touch, Error<SPI, CS, DR>> {
-        if false {
-            return Err(Error::Other);
-        }
-        Ok(Touch { x: 0, y: 0, z: 0 })
+    pub fn get_absolute(&mut self) -> Result<Touch, Error<SPI, CS, DR>> {
+        let mut buffer = [0; 6];
+        self.rap_read(chip::Addr::PacketByte0, &mut buffer);
+        Ok(Touch {
+            // TODO: would bitfields clean this up?
+            x: buffer[2] as u16 | ((buffer[4] as u16 & 0x0F) << 8),
+            y: buffer[3] as u16 | ((buffer[4] as u16 & 0xF0) << 4),
+            z: buffer[5] as u16 & 0x3F,
+        })
     }
 
     pub fn clear_flags(&mut self) {
@@ -79,6 +83,17 @@ impl<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> Driver<SPI, CS, DR> {
         self.deassert_cs();
     }
 
+    fn rap_read(&mut self, address: chip::Addr, buffer: &mut [u8]) {
+        let mut cmd_buf: [u8; 3] = [chip::READ_MASK | address as u8, 0xFC, 0xFC]; // 0xFC are filler bytes in Cirque's Arduino example; TODO - try removing it?
+
+        // TODO: handle all the errors from SPI and whatnot
+
+        self.assert_cs();
+        self.spi.transfer(&mut cmd_buf);
+        self.spi.transfer(buffer);
+        self.deassert_cs();
+    }
+
     fn assert_cs(&mut self) {
         self.cs.set_low();
     }
@@ -89,9 +104,9 @@ impl<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> Driver<SPI, CS, DR> {
 }
 
 pub struct Touch {
-    pub x: u8,
-    pub y: u8,
-    pub z: u8,
+    pub x: u16,
+    pub y: u16,
+    pub z: u16,
 }
 
 mod chip {
@@ -99,11 +114,13 @@ mod chip {
     pub const READ_MASK: u8 = 0xA0;
 
     pub enum Addr {
+        // TODO: fill this out for completeness
         Status1 = 0x02,
         SysConfig1 = 0x03,
         FeedConfig1 = 0x04,
         FeedConfig2 = 0x05,
         ZIdle = 0x0A,
+        PacketByte0 = 0x12,
     }
 }
 
