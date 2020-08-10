@@ -6,6 +6,8 @@ extern crate panic_semihosting;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
+use embedded_hal::digital::v2::OutputPin;
+
 use stm32f1xx_hal::{
     delay::Delay,
     prelude::*,
@@ -30,6 +32,10 @@ fn main() -> ! {
     let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
 
     let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+
+    let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+    led.set_high();
 
     // TODO: add CS and DR pins
     let cs = gpioa.pa4.into_push_pull_output(&mut gpioa.crl); // TODO: correct pin and port
@@ -54,13 +60,19 @@ fn main() -> ! {
         )
     };
 
+    hprintln!("Initiating device...").unwrap();
+
     // TODO: fix these unwrap hacks
     let mut device = Driver::new(spi, cs, dr, delay).unwrap_or_else(|_| panic!("donezo"));
+    hprintln!("device initiated").unwrap();
 
     loop {
         if device.data_ready().unwrap() {
+            led.set_low();
             let pos = device.get_absolute().unwrap_or_else(|_| panic!("donezo"));
             hprintln!("{}\t{}\t{}", pos.x, pos.y, pos.z).unwrap();
+        } else {
+            led.set_high();
         }
     }
 }
