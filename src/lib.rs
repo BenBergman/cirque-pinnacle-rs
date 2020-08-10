@@ -1,6 +1,7 @@
 #![no_std]
 
 //use bitfield::bitfield; // TODO: use this?
+use embedded_hal::blocking::delay::DelayUs;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::InputPin;
 use embedded_hal::digital::v2::OutputPin;
@@ -13,20 +14,23 @@ pub enum Error<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> {
     Other,
 }
 
-pub struct Driver<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> {
+pub struct Driver<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin, DELAY: DelayUs<u8>> {
     spi: SPI, // TODO: Add I2C compatibility
     cs: CS,   // TODO: make this an option?
     dr: DR,   // TODO: Make this an Option?
+    delay: DELAY,
 }
 
 // TODO: implement simplest setup and interface (match arduino example)
 // TODO: implement feature complete interface - builder pattern?
 
-impl<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> Driver<SPI, CS, DR> {
-    pub fn new(spi: SPI, cs: CS, dr: DR) -> Result<Self, Error<SPI, CS, DR>> {
+impl<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin, DELAY: DelayUs<u8>>
+    Driver<SPI, CS, DR, DELAY>
+{
+    pub fn new(spi: SPI, cs: CS, dr: DR, delay: DELAY) -> Result<Self, Error<SPI, CS, DR>> {
         // TODO: return result confirming setup worked
         //  - possibly check chip's ID?
-        let mut driver = Self { cs, dr, spi };
+        let mut driver = Self { cs, dr, spi, delay };
         driver.clear_flags()?;
 
         // TODO: better function names? bitfields?
@@ -54,8 +58,9 @@ impl<SPI: Transfer<u8>, CS: OutputPin, DR: InputPin> Driver<SPI, CS, DR> {
     }
 
     pub fn clear_flags(&mut self) -> Result<(), Error<SPI, CS, DR>> {
-        self.rap_write(chip::Addr::Status1, 0x00)
-        // TODO: delayMicroseconds(50); // TODO: add non-blocking delay?
+        let result = self.rap_write(chip::Addr::Status1, 0x00);
+        self.delay.delay_us(50); // TODO: add non-blocking delay?
+        result
     }
 
     fn init_sys_config(&mut self) -> Result<(), Error<SPI, CS, DR>> {

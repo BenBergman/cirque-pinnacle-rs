@@ -7,6 +7,7 @@ use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
 use stm32f1xx_hal::{
+    delay::Delay,
     prelude::*,
     spi::{Mode, Phase, Polarity, Spi},
     stm32,
@@ -17,11 +18,14 @@ use cirque::Driver;
 #[entry]
 fn main() -> ! {
     let dp = stm32::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
 
     let mut flash = dp.FLASH.constrain();
     let mut rcc = dp.RCC.constrain();
 
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
+
+    let delay = Delay::new(cp.SYST, clocks);
 
     let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
 
@@ -51,7 +55,7 @@ fn main() -> ! {
     };
 
     // TODO: fix these unwrap hacks
-    let mut device = Driver::new(spi, cs, dr).unwrap_or_else(|_| panic!("donezo"));
+    let mut device = Driver::new(spi, cs, dr, delay).unwrap_or_else(|_| panic!("donezo"));
 
     loop {
         if device.data_ready().unwrap() {
